@@ -1,0 +1,26 @@
+{
+  "id": "breaking-change",
+  "name": "Breaking-change detection",
+  "task": "breaking-change",
+  "description": "Find consumers of APIs that look removed or renamed. Refine selectors after Plan diffs the public surface.",
+  "batchSize": 20,
+  "selectors": [
+    {
+      "kind": "lexical",
+      "id": "import-from-package",
+      "description": "ESM/CJS imports — refine pattern to the package under change",
+      "pattern": "from ['\\\"]([^'\\\"]+)['\\\"]|require\\(['\\\"]([^'\\\"]+)['\\\"]\\)",
+      "include": ["**/*.{js,ts,tsx,jsx,mjs,cjs}"]
+    },
+    {
+      "kind": "lexical",
+      "id": "symbol-use-placeholder",
+      "description": "Replace DEPRECATED_API with symbols removed in the release",
+      "pattern": "\\bDEPRECATED_API\\b",
+      "include": ["**/*.{js,ts,tsx,jsx,py,go}"]
+    }
+  ],
+  "mapGuidance": "For each signal, decide whether the call site breaks given the API diff in the profile notes / PR description. Classify compile-break vs behavioral break. Name the owning package.",
+  "reduceGuidance": "Group call sites under the API change that caused them. Produce one migration plan per breaking change with ordered steps and owners.",
+  "verifyGuidance": "Run typecheck/tests for affected packages. Confirmed = still fails. False positive = compiles/tests green."
+}

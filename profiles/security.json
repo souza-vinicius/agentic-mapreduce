@@ -1,0 +1,69 @@
+{
+  "id": "security-baseline",
+  "name": "Security baseline",
+  "task": "security",
+  "description": "Recall-oriented lexical selectors for common sinks and trust boundaries. Broad by design; Map applies the FP gate.",
+  "batchSize": 12,
+  "selectors": [
+    {
+      "kind": "lexical",
+      "id": "dangerous-eval",
+      "description": "Dynamic code execution sinks",
+      "pattern": "\\b(eval|exec|execSync|spawnSync|Function)\\s*\\(",
+      "include": ["**/*.{js,jsx,ts,tsx,mjs,cjs,py,php,rb}"]
+    },
+    {
+      "kind": "lexical",
+      "id": "sql-concat",
+      "description": "Likely SQL string concatenation",
+      "pattern": "(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE).{0,80}(\\+|`|\\$\\{|f[\"'])",
+      "flags": "gmi",
+      "include": ["**/*.{js,ts,py,go,java,rb,php}"]
+    },
+    {
+      "kind": "lexical",
+      "id": "child-process",
+      "description": "Process execution APIs",
+      "pattern": "\\b(child_process|os\\.system|subprocess\\.|Runtime\\.getRuntime\\(\\)\\.exec|ProcessBuilder)\\b",
+      "include": ["**/*.{js,ts,py,java,go}"]
+    },
+    {
+      "kind": "lexical",
+      "id": "deser-sinks",
+      "description": "Deserialization entry points",
+      "pattern": "\\b(pickle\\.loads|yaml\\.load\\(|unserialize\\(|ObjectInputStream|JSON\\.parse\\(.*req|deserialize)\\b",
+      "include": ["**/*.{py,php,java,js,ts}"]
+    },
+    {
+      "kind": "lexical",
+      "id": "ssrf-hints",
+      "description": "Outbound request with variable URL",
+      "pattern": "\\b(fetch|axios|request|http\\.get|urllib|requests\\.(get|post))\\s*\\(\\s*[^\"'\\n]+",
+      "include": ["**/*.{js,ts,py}"]
+    },
+    {
+      "kind": "lexical",
+      "id": "path-join-user",
+      "description": "Path joins that may include user input",
+      "pattern": "\\b(path\\.join|os\\.path\\.join|filepath\\.Join)\\s*\\(",
+      "include": ["**/*.{js,ts,py,go}"]
+    },
+    {
+      "kind": "lexical",
+      "id": "auth-boundary",
+      "description": "Auth middleware / guards / decorators",
+      "pattern": "@(LoginRequired|RequiresAuth|auth_required|authorize)|\\b(isAuthenticated|requireAuth|ensure_login|authorize)\\b",
+      "include": ["**/*.{js,ts,py,go,java,rb}"]
+    },
+    {
+      "kind": "lexical",
+      "id": "route-decl",
+      "description": "HTTP route declarations",
+      "pattern": "\\b(app|router|fastify)\\.(get|post|put|delete|patch|use)\\s*\\(|@(Get|Post|Put|Delete|Patch|RequestMapping|app\\.route)\\b",
+      "include": ["**/*.{js,ts,py,java,go}"]
+    }
+  ],
+  "mapGuidance": "You are hunting real vulnerabilities (RCE, injection, SSRF, path traversal, auth bypass, insecure deserialization). For each signal, decide if it is exploitable given surrounding auth, validation, and data flow. Report only findings that clear a false-positive gate. Include preconditions an attacker must satisfy.",
+  "reduceGuidance": "Deduplicate. Prefer the strongest root-cause statement. Build attack chains when one finding's effect satisfies another's precondition. Triage P0 = remotely exploitable without auth or with trivial auth bypass; P1 = serious with constraints; P2 = defense-in-depth; P3 = informational.",
+  "verifyGuidance": "Reproduce against a running build when possible. Prefer a minimal PoC. If the service cannot be started, mark inconclusive and say what blocked you."
+}

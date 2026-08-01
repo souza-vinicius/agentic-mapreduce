@@ -1,0 +1,19 @@
+---
+description: Prefer Agentic MapReduce for whole-repo analysis tasks
+globs:
+alwaysApply: false
+---
+
+# Whole-repo tasks → Agentic MapReduce
+
+If the user asks for a security scan, breaking-change sweep, large migration, or any analysis that is only trustworthy if the **entire** codebase was considered, follow the skill `.cursor/skills/agentic-mapreduce/SKILL.md`.
+
+Do not run a single search-driven agent across the monorepo for those tasks. Use:
+
+1. `amr-planner` (optional) → profile selectors
+2. `amr shard` (deterministic)
+3. Parallel `amr-map-worker` Tasks (one per batch)
+4. `amr-reducer`
+5. `amr-verifier` for P0/P1
+
+Local bugfixes and single-module features stay on the normal agent loop.

@@ -1,0 +1,26 @@
+{
+  "id": "migration",
+  "name": "Large-scale migration",
+  "task": "migration",
+  "description": "Locate every reference to the legacy API so Map workers can rewrite bounded shards.",
+  "batchSize": 15,
+  "selectors": [
+    {
+      "kind": "lexical",
+      "id": "legacy-import",
+      "description": "Replace legacy-package with the real package name being migrated",
+      "pattern": "from ['\\\"]legacy-package['\\\"]|require\\(['\\\"]legacy-package['\\\"]\\)",
+      "include": ["**/*.{js,ts,tsx,jsx}"]
+    },
+    {
+      "kind": "lexical",
+      "id": "legacy-symbol",
+      "description": "Replace LegacyClient with the real symbol",
+      "pattern": "\\bLegacyClient\\b",
+      "include": ["**/*.{js,ts,tsx,jsx}"]
+    }
+  ],
+  "mapGuidance": "Rewrite this shard from the legacy API to the target API. Keep changes minimal. Run the tightest local tests you can. Report residual refs and blockers. Structured result: files_changed, residual_refs, test_status, blockers.",
+  "reduceGuidance": "Merge leftover refs. Detect duplicate helpers created by parallel workers. Order PRs so shared libs land before apps.",
+  "verifyGuidance": "CI green for touched packages; smoke the migrated flows."
+}

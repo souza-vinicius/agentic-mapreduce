@@ -1,0 +1,29 @@
+{
+  "name": "@cursor/agentic-mapreduce",
+  "version": "0.1.0",
+  "description": "Agentic MapReduce for Cursor: deterministic shard + parallel map agents",
+  "main": "dist/cli.js",
+  "files": [
+    "dist",
+    "profiles",
+    ".cursor",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node --test 'dist/**/*.test.js'",
+    "shard": "node dist/cli.js shard",
+    "demo": "npm run build && node dist/cli.js shard --repo fixtures/vulnerable-app --profile profiles/security.json --out .amr/runs/demo --batch-size 8"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bin": {
+    "amr": "dist/cli.js"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
+}

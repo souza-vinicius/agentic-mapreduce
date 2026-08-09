@@ -1,6 +1,21 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { asRelPath, type LexicalSelector, type RelPath, type ScanProfile, type Signal } from "./types.js";
+import {
+  defaultIncludeForLang,
+  langForPath,
+  parseSource,
+  resolveLang,
+  runAstSelector,
+  type ParsedRoot,
+} from "./ast.js";
+import {
+  asRelPath,
+  type AstSelector,
+  type LexicalSelector,
+  type RelPath,
+  type ScanProfile,
+  type Signal,
+} from "./types.js";
 
 const DEFAULT_INCLUDE = [
   "**/*.{ts,tsx,js,jsx,mjs,cjs,py,go,rs,rb,java,kt,cs,php,swift,dart,ex,exs,c,cc,cpp,h,hpp,sql,yml,yaml,json,toml}",
@@ -97,8 +112,12 @@ async function walkFiles(root: string): Promise<RelPath[]> {
   return out;
 }
 
-function fileMatchesSelector(rel: RelPath, selector: LexicalSelector): boolean {
-  const include = selector.include ?? DEFAULT_INCLUDE;
+function fileMatchesSelector(
+  rel: RelPath,
+  selector: LexicalSelector | AstSelector,
+  defaultInclude: string[],
+): boolean {
+  const include = selector.include ?? defaultInclude;
   const exclude = [...DEFAULT_EXCLUDE, ...(selector.exclude ?? [])];
   if (matchesAny(rel, exclude)) return false;
   return matchesAny(rel, include);
@@ -143,6 +162,8 @@ export async function runShard(args: {
   repoRoot: string;
   profile: ScanProfile;
   onlyPaths?: RelPath[];
+  /** When false (default), selectors with kind "ast" are skipped. */
+  enableAst?: boolean;
 }): Promise<ShardResult> {
   const root = path.resolve(args.repoRoot);
   const st = await stat(root);
@@ -150,6 +171,7 @@ export async function runShard(args: {
     throw new Error(`repoRoot is not a directory: ${root}`);
   }
 
+  const enableAst = args.enableAst === true;
   const files = args.onlyPaths ?? (await walkFiles(root));
   const signals: Signal[] = [];
   const matched = new Set<string>();
@@ -166,14 +188,45 @@ export async function runShard(args: {
     }
 
     let hit = false;
+    const astRoots = new Map<string, ParsedRoot | undefined>();
+
     for (const selector of args.profile.selectors) {
-      if (selector.kind !== "lexical") continue;
-      if (!fileMatchesSelector(rel, selector)) continue;
-      const found = runLexical(selector, rel, text);
-      if (found.length > 0) {
-        hit = true;
-        signals.push(...found);
+      if (selector.kind === "lexical") {
+        if (!fileMatchesSelector(rel, selector, DEFAULT_INCLUDE)) continue;
+        const found = runLexical(selector, rel, text);
+        if (found.length > 0) {
+          hit = true;
+          signals.push(...found);
+        }
+        continue;
       }
+
+      if (selector.kind === "ast") {
+        if (!enableAst) continue;
+        const canonical = resolveLang(selector.language);
+        if (!canonical) continue;
+        const fileLang = langForPath(rel);
+        if (fileLang !== canonical) continue;
+        const include = selector.include ?? defaultIncludeForLang(canonical);
+        if (!fileMatchesSelector(rel, selector, include)) continue;
+
+        let parsed = astRoots.get(canonical);
+        if (!astRoots.has(canonical)) {
+          parsed = await parseSource({ language: selector.language, text });
+          astRoots.set(canonical, parsed);
+        }
+        if (!parsed) continue;
+
+        const found = runAstSelector({ selector, rel, root: parsed });
+        if (found.length > 0) {
+          hit = true;
+          signals.push(...found);
+        }
+        continue;
+      }
+
+      const _exhaustive: never = selector;
+      void _exhaustive;
     }
     if (hit) matched.add(rel);
   }

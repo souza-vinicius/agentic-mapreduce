@@ -11,7 +11,7 @@ function usage(): never {
   console.error(`amr — Agentic MapReduce (Cursor)
 
 Usage:
-  amr shard --repo <path> --profile <profile.json> [--out <dir>] [--batch-size N] [--incremental <commit>]
+  amr shard --repo <path> --profile <profile.json> [--out <dir>] [--batch-size N] [--incremental <commit>] [--ast]
   amr prompt map --manifest <shard-manifest.json> --batch <batch-id>
   amr prompt reduce --manifest <shard-manifest.json> --findings <findings.jsonl>
   amr prompt plan --repo <path> --task <security|breaking-change|migration>
@@ -19,7 +19,7 @@ Usage:
 
 Stages:
   Plan   → Cursor agent amr-planner (writes/edits profile selectors)
-  Shard  → this CLI (deterministic; no model)
+  Shard  → this CLI (deterministic; no model). Pass --ast to enable kind:"ast" selectors.
   Map    → Cursor agent amr-map-worker (one per batch; use Task tool in parallel)
   Reduce → Cursor agent amr-reducer
   Verify → Cursor agent amr-verifier (optional)
@@ -33,6 +33,10 @@ function getFlag(args: string[], name: string): string | undefined {
   return args[i + 1];
 }
 
+function hasFlag(args: string[], name: string): boolean {
+  return args.includes(name);
+}
+
 async function cmdShard(args: string[]): Promise<void> {
   const repo = getFlag(args, "--repo") ?? process.cwd();
   const profilePath = getFlag(args, "--profile");
@@ -42,6 +46,7 @@ async function cmdShard(args: string[]): Promise<void> {
     path.join(repo, ".amr", "runs", new Date().toISOString().replaceAll(":", "-"));
   const batchSizeFlag = getFlag(args, "--batch-size");
   const since = getFlag(args, "--incremental");
+  const enableAst = hasFlag(args, "--ast");
 
   const profile = await loadProfile(profilePath);
   if (batchSizeFlag) profile.batchSize = Number(batchSizeFlag);
@@ -52,6 +57,7 @@ async function cmdShard(args: string[]): Promise<void> {
   const shard = await runShard({
     repoRoot: repo,
     profile,
+    enableAst,
     ...(onlyPaths ? { onlyPaths } : {}),
   });
   const batches = packBatches({ signals: shard.signals, batchSize: profile.batchSize });
@@ -89,6 +95,7 @@ async function cmdShard(args: string[]): Promise<void> {
     filesMatched: shard.fileCountMatched,
     filesDropped: shard.droppedFileCount,
     filesScanned: shard.fileCountScanned,
+    enableAst,
   };
   await writeFile(path.join(outDir, "summary.json"), JSON.stringify(summary, null, 2));
   console.log(JSON.stringify(summary, null, 2));
@@ -152,8 +159,10 @@ Repository: ${args.repoRoot}
 Task: ${args.task}
 
 Study the repo structure, frameworks, entry points, and conventions.
-Author or refine a scan profile JSON with lexical selectors that catch relevant code with high recall.
-Selectors must be concrete regexes (kind: "lexical") that can run with no model in the loop.
+Author or refine a scan profile JSON with deterministic selectors.
+Prefer kind:"ast" (ast-grep patterns for javascript/typescript/tsx) for structural sinks when precision matters.
+Keep kind:"lexical" (JS RegExp) for cross-language recall and text-ish patterns.
+AST selectors only run when the operator passes --ast to amr shard; always include lexical coverage so default shards still work.
 
 Write the profile to profiles/<task>.generated.json (or update an existing profile).
 Explain which selectors you chose and known recall gaps.

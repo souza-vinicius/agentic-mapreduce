@@ -25,5 +25,8 @@
   "devDependencies": {
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@ast-grep/napi": "^0.45.1"
   }
 }

@@ -69,6 +69,8 @@ Gasto de raciocínio: uma vez. Depois o custo se amortiza em execuções determi
 
 Selectors rodam em cada arquivo. Cada match emite um signal (path, selector, evidência). Arquivos sem signal nunca chegam ao Map.
 
+Nesta replica Cursor: selectors `lexical` (regex) são o default; `kind: "ast"` (ast-grep via `@ast-grep/napi`, JS/TS/TSX) só entra com `amr shard --ast`.
+
 Signals viram batches. Completeness = fila finita esgotada. O gargalo real muda de "o agente procurou bem?" para "os selectors têm recall?".
 
 #### 3. Map (agentic, paralelo)

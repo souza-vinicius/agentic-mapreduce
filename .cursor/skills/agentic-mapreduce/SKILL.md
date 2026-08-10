@@ -29,13 +29,19 @@ Plan (amr-planner) → Shard (amr CLI) → Map (N × amr-map-worker) → Reduce 
 ### 1. Plan
 
 Delegate to subagent `amr-planner` (or run `amr prompt plan --repo <path> --task security`).
-Result: a profile JSON under `profiles/` with lexical selectors.
+Result: a profile JSON under `profiles/` with lexical and optional AST selectors.
 
 ### 2. Shard (deterministic)
 
 ```bash
 npm run build
 node dist/cli.js shard --repo <target-repo> --profile profiles/security.json --out .amr/runs/<id>
+```
+
+Optional structural matching (skips `kind:"ast"` unless passed):
+
+```bash
+node dist/cli.js shard --repo <target-repo> --profile profiles/security.json --out .amr/runs/<id> --ast
 ```
 
 This writes `shard-manifest.json`, per-batch JSON files, and `summary.json`.
@@ -80,6 +86,7 @@ For each P0/P1 finding, `amr prompt verify --finding ...` and run `amr-verifier`
 | `batchSize` in profile / `--batch-size` | Workers × tokens |
 | Selector recall vs precision | Broad selectors cost more Map; narrow miss bugs |
 | `--incremental` | Pay for the diff |
+| `--ast` | Run `kind:"ast"` selectors (JS/TS via `@ast-grep/napi`); default is lexical-only |
 | Skip Verify | Faster, weaker proof |
 
 ## Parent orchestrator checklist

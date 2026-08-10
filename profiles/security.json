@@ -2,7 +2,7 @@
   "id": "security-baseline",
   "name": "Security baseline",
   "task": "security",
-  "description": "Recall-oriented lexical selectors for common sinks and trust boundaries. Broad by design; Map applies the FP gate.",
+  "description": "Recall-oriented lexical selectors plus optional AST companions (enable with amr shard --ast). Broad by design; Map applies the FP gate.",
   "batchSize": 12,
   "selectors": [
     {
@@ -61,6 +61,46 @@
       "description": "HTTP route declarations",
       "pattern": "\\b(app|router|fastify)\\.(get|post|put|delete|patch|use)\\s*\\(|@(Get|Post|Put|Delete|Patch|RequestMapping|app\\.route)\\b",
       "include": ["**/*.{js,ts,py,java,go}"]
+    },
+    {
+      "kind": "ast",
+      "id": "dangerous-eval-ast",
+      "description": "eval() call (structural; requires --ast)",
+      "language": "javascript",
+      "pattern": "eval($ARG)",
+      "include": ["**/*.{js,jsx,mjs,cjs}"]
+    },
+    {
+      "kind": "ast",
+      "id": "child-process-exec-ast",
+      "description": "child_process.exec call (structural; requires --ast)",
+      "language": "javascript",
+      "pattern": "exec($CMD, $$$)",
+      "include": ["**/*.{js,jsx,mjs,cjs}"]
+    },
+    {
+      "kind": "ast",
+      "id": "path-join-ast",
+      "description": "path.join call (structural; requires --ast)",
+      "language": "javascript",
+      "pattern": "path.join($$$)",
+      "include": ["**/*.{js,jsx,mjs,cjs}"]
+    },
+    {
+      "kind": "ast",
+      "id": "fetch-ast",
+      "description": "fetch(url) call (structural; requires --ast)",
+      "language": "javascript",
+      "pattern": "fetch($URL)",
+      "include": ["**/*.{js,jsx,mjs,cjs}"]
+    },
+    {
+      "kind": "ast",
+      "id": "route-decl-ast",
+      "description": "Express-style route registration (structural; requires --ast)",
+      "language": "javascript",
+      "pattern": "app.$METHOD($PATH, $$$)",
+      "include": ["**/*.{js,jsx,mjs,cjs}"]
     }
   ],
   "mapGuidance": "You are hunting real vulnerabilities (RCE, injection, SSRF, path traversal, auth bypass, insecure deserialization). For each signal, decide if it is exploitable given surrounding auth, validation, and data flow. Report only findings that clear a false-positive gate. Include preconditions an attacker must satisfy.",

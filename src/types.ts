@@ -3,7 +3,7 @@ export type RelPath = string & { readonly __brand: "RelPath" };
 
 export type Severity = "P0" | "P1" | "P2" | "P3";
 
-export type SelectorKind = "lexical";
+export type SelectorKind = "lexical" | "ast";
 
 export type LexicalSelector = {
   kind: "lexical";
@@ -17,7 +17,20 @@ export type LexicalSelector = {
   exclude?: string[];
 };
 
-export type Selector = LexicalSelector;
+export type AstSelector = {
+  kind: "ast";
+  id: string;
+  description: string;
+  /** ast-grep language alias, e.g. javascript | typescript | python. */
+  language: string;
+  /** Structural pattern, e.g. "eval($ARG)". */
+  pattern: string;
+  /** Glob of files this selector applies to. Default: language extensions. */
+  include?: string[];
+  exclude?: string[];
+};
+
+export type Selector = LexicalSelector | AstSelector;
 
 export type ScanProfile = {
   id: string;

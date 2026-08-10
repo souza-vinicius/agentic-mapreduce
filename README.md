@@ -38,6 +38,16 @@ node dist/cli.js shard \
   --batch-size 8
 ```
 
+AST opcional (mais preciso em JS/TS; ignora comments/strings):
+
+```bash
+node dist/cli.js shard \
+  --repo fixtures/vulnerable-app \
+  --profile profiles/security.json \
+  --out .amr/runs/demo-ast \
+  --ast
+```
+
 Saída esperada: `shard-manifest.json`, `batch-*.json`, `summary.json`.
 Arquivos sem signal são dropados antes de qualquer Map.
 
@@ -78,7 +88,7 @@ Só re-scaneia paths do `git diff` desde o commit.
 
 ## Limites (v0.1)
 
-- Selectors só **lexical** (regex). AST/Tree-sitter e call-graph ficam para depois.
+- Selectors: **lexical** (regex) por default; **AST** (`kind: "ast"` via `@ast-grep/napi`) só com `amr shard --ast`. O napi cobre JS/TS/TSX/HTML/CSS — não o CLI multilíngue completo. Call-graph fica para depois.
 - Verify é agentic (sandbox local), não um harness automático por finding.
 - Map/Reduce dependem do Agent do Cursor — a CLI não chama LLM.
 

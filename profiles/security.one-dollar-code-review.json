@@ -1,0 +1,256 @@
+{
+  "id": "security-one-dollar-code-review",
+  "name": "1 Dollar Code Review security",
+  "task": "security",
+  "description": "Recall-oriented security scan of the FastAPI + Next.js 1 Dollar Code Review SaaS: GitHub App OAuth, HMAC/OIDC webhooks, Cloud Tasks workers, Stripe billing, admin RBAC, JWT cookies, CSRF double-submit, SQLAlchemy, and dashboard IDOR. Map applies the FP gate.",
+  "batchSize": 10,
+  "selectors": [
+    {
+      "kind": "lexical",
+      "id": "fastapi-routes",
+      "description": "FastAPI/Starlette route registration and router composition (entry points that must have an auth story)",
+      "pattern": "@(router|app)\\.(get|post|put|patch|delete|head|options|websocket)\\b|\\bAPIRouter\\s*\\(|\\.include_router\\s*\\(|prefix\\s*=\\s*[\"']/api",
+      "include": ["**/*.py"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "auth-boundaries",
+      "description": "Session, admin RBAC, CSRF double-submit, JWT, HMAC, OAuth helpers, and dashboard/admin auth gates",
+      "pattern": "\\b(require_admin|get_session|enforce_csrf|get_authorized_org|create_session_token|create_csrf_token|create_oauth_login_state|consume_oauth_login_state|create_persisted_session|revoke_user_session|hmac\\.compare_digest|jwt\\.(encode|decode)|SESSION_SECRET|SESSION_COOKIE_NAME|XSRF-TOKEN|X-XSRF-TOKEN|ADMIN_GITHUB_LOGINS|unauthenticated|authenticated_no_permission|classifyProtectedFailure)\\b",
+      "include": ["**/*.{py,ts,tsx}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "webhook-signatures",
+      "description": "GitHub/Stripe/GCP webhook signature headers and verifiers",
+      "pattern": "X-Hub-Signature-256|X-GitHub-(Event|Delivery)|Stripe-Signature|X-Task-Token|verify_github_hmac|construct_stripe_event|Webhook\\.construct_event|sha256=|STRIPE_WEBHOOK_SECRET|GITHUB_WEBHOOK_SECRET",
+      "include": ["**/*.py"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "worker-auth-oidc",
+      "description": "Cloud Tasks / Pub/Sub worker auth (OIDC Bearer and static X-Task-Token fallback) and GCP budget HARD_STOP",
+      "pattern": "\\b(verify_worker_request|verify_budget_alert_request|verify_oidc_or_static|verify_oauth2_token|CLOUD_TASKS_SA_EMAIL|CLOUD_TASKS_AUTH_TOKEN|CLOUD_TASKS_WORKER_URL|allows_static_worker_token|apply_worker_auth|BUDGET_ALERTS_SA_EMAIL|oidc_token|HARD_STOP|apply_gcp_budget_alert|CircuitBreaker)\\b",
+      "include": ["**/*.py"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "sql-execute",
+      "description": "SQLAlchemy execute/text, dialect upserts, and likely SQL string concatenation",
+      "pattern": "\\b(text|literal_column|from_statement|upsert_for|pg_insert|sqlite_insert)\\s*\\(|\\.(execute|executemany|scalar|scalars)\\s*\\(|f[\"'].{0,160}(SELECT|INSERT|UPDATE|DELETE|WHERE|JOIN)|[\"'].{0,80}(SELECT|INSERT|UPDATE|DELETE).{0,80}(\\+|%|\\.format)",
+      "flags": "gmi",
+      "include": ["**/*.{py,sql}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "ssrf-outbound",
+      "description": "Outbound HTTP (httpx/requests/urllib/fetch) and GitHub URL construction from owner/repo/PR fields",
+      "pattern": "\\b(httpx|aiohttp|urllib\\.request|requests)\\b|\\b(AsyncClient|urlopen)\\s*\\(|\\b(client|httpx)\\.(get|post|put|patch|delete|request)\\s*\\(|\\bfetch\\s*\\(|/repos/\\{|GITHUB_TOKEN_URL|GITHUB_API_URL|base_url\\s*=",
+      "include": ["**/*.{py,ts,tsx,js}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "path-file-io",
+      "description": "Path joins and file reads/writes that may include user-controlled names",
+      "pattern": "\\b(os\\.path\\.(join|abspath|normpath)|pathlib\\.Path|Path\\s*\\(|open\\s*\\(|read_text|write_text|read_bytes|expanduser)\\b",
+      "include": ["**/*.py"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "code-exec-deser",
+      "description": "Dynamic execution, subprocess, pickle, and YAML load (including safe_load of untrusted PR config)",
+      "pattern": "\\b(eval|exec|compile|pickle\\.(load|loads)|yaml\\.(load|safe_load|unsafe_load|full_load)|subprocess\\.(run|Popen|call|check_output|check_call)|os\\.(system|popen)|child_process)\\b",
+      "include": ["**/*.{py,ts,tsx,js,yml,yaml}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "stripe-billing",
+      "description": "Stripe webhook, Checkout Session, billing portal, and ledger credit grant/deduct paths",
+      "pattern": "\\bstripe\\.|construct_stripe_event|create_checkout|checkout\\.Session|billing_portal|STRIPE_(API_KEY|WEBHOOK_SECRET|PRICE_)|client_reference_id|invoice\\.payment|checkout\\.session\\.completed|customer\\.subscription|deduct_for_review|grant_subscription|add_topup|get_active_balance|overdraft|onCheckoutPreview|checkoutPending",
+      "include": ["**/*.{py,ts,tsx}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "cors-cookies",
+      "description": "CORS allowlist, cookie domain/SameSite/Secure/HttpOnly, and FRONTEND/BACKEND URL topology",
+      "pattern": "\\b(CORSMiddleware|ALLOWED_ORIGINS|allow_origins|allow_credentials|SESSION_COOKIE_DOMAIN|XSRF_COOKIE_DOMAIN|set_cookie|delete_cookie|samesite|httponly|SameSite|FRONTEND_URL|BACKEND_URL|validate_cors)\\b",
+      "flags": "gmi",
+      "include": ["**/*.{py,ts,tsx}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "secret-logging",
+      "description": "Secret material and log/print sites that may leak tokens, cookies, or keys",
+      "pattern": "\\b(get_secret_value|SecretStr|GEMINI_API_KEY|ANTHROPIC_API_KEY|SESSION_SECRET|ENCRYPTION_SECRET|GITHUB_APP_PRIVATE_KEY|GITHUB_CLIENT_SECRET|STRIPE_API_KEY|CLOUD_TASKS_AUTH_TOKEN|access_token|client_secret|private_key|GH_TOKEN|github-token|NEXT_PUBLIC_[A-Z0-9_]*(SECRET|TOKEN|KEY|PASSWORD|DSN))\\b|logger\\.(debug|info|warning|error|exception|critical)\\s*\\([\\s\\S]{0,220}(token|secret|password|authorization|cookie|api_key|jwt|signature|Bearer)",
+      "flags": "gmi",
+      "include": ["**/*.{py,ts,tsx,yml,yaml,json}", "**/.env*", "**/action.yml"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "idor-tenancy",
+      "description": "Tenant object IDs (snake and camelCase) and the authorization helper that must wrap them (IDOR)",
+      "pattern": "\\b(org_id|repo_id|review_id|organization_id|repository_id|github_installation_id|github_repo_id|client_reference_id)\\b|[Oo]rgId\\b|[Rr]epoId\\b|[Rr]eviewId\\b|get_authorized_org|getAdmin[A-Z]\\w*|updateAdmin[A-Z]\\w*|/organizations/\\{|/repositories/\\{|/reviews/\\{|/admin/organizations",
+      "include": ["**/*.{py,ts,tsx}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "csrf-double-submit",
+      "description": "CSRF double-submit cookie/header echo on dashboard and admin mutations",
+      "pattern": "\\b(enforce_csrf|create_csrf_token|XSRF_COOKIE_NAME|XSRF_HEADER_NAME|XSRF-TOKEN|X-XSRF-TOKEN|xsrfHeaderToken|CSRF_EXEMPT_METHODS)\\b",
+      "include": ["**/*.{py,ts,tsx}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "oauth-redirects",
+      "description": "OAuth login/callback, open redirects, Host-header www→apex redirects, and post-login return_to handling",
+      "pattern": "\\b(RedirectResponse|_safe_return_to|return_to|OAUTH_STATE|github/login|github/callback|window\\.location|checkout_url|FRONTEND_URL|NextResponse\\.redirect|shouldRedirectWww|normalizeHost|hostHeader)\\b",
+      "include": ["**/*.{py,ts,tsx}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "rate-limit",
+      "description": "Per-scope rate limits and GitHub installation quota (auth/webhook/dashboard bypass)",
+      "pattern": "\\b(rate_limit|RATE_LIMIT_|verify_installation_rate_limit|check_rate_limit|INSTALLATION_MAX_REQUESTS)\\b",
+      "include": ["**/*.py"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "prompt-injection-llm",
+      "description": "Untrusted PR/diff/YAML flowing into LLM prompts (prompt injection and instruction override)",
+      "pattern": "\\b(sanitize_prompt|yaml\\.(safe_)?load|DIFF_OPEN_TAG|pr_diff|previous_findings|repo_instructions|devreview\\.yml|TURN_DELIMITERS|pr_context)\\b",
+      "include": ["**/*.{py,md,yml,yaml}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "xss-dom",
+      "description": "DOM XSS sinks and untrusted href/blob URLs in the Next.js dashboard",
+      "pattern": "\\b(dangerouslySetInnerHTML|innerHTML|document\\.write|createObjectURL)\\b|href=\\{",
+      "include": ["**/*.{ts,tsx,js,jsx}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "frontend-session",
+      "description": "Browser cookie/CSRF echo, credentialed fetch, and NEXT_PUBLIC secrets",
+      "pattern": "\\b(document\\.cookie|credentials:\\s*['\"]include['\"]|XSRF-TOKEN|X-XSRF-TOKEN|NEXT_PUBLIC_[A-Z0-9_]+)\\b",
+      "include": ["**/*.{ts,tsx,js,jsx}", "**/.env*"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "security-headers-openapi",
+      "description": "Security headers, OpenAPI exposure, request logging, and request-profiling HTML that can leak internals",
+      "pattern": "\\b(Content-Security-Policy|X-Frame-Options|Strict-Transport-Security|Cross-Origin-Resource-Policy|openapi_url|SecurityHeadersMiddleware|request_profiling|\\?profile|RequestLoggingMiddleware|JSONFormatter)\\b",
+      "include": ["**/*.py"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "cloud-tasks-enqueue",
+      "description": "Cloud Tasks enqueue of review/explain/cleanup workers (auth, audience, payload trust)",
+      "pattern": "\\b(CloudTasksService|enqueue_review_task|enqueue_explain_task|apply_worker_auth_to_http_request|ProcessReviewTask|_build_cloud_task)\\b",
+      "include": ["**/*.py"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "lexical",
+      "id": "feature-flags",
+      "description": "Feature-flag kill switches, env overrides, and allowlists that can bypass review/billing controls",
+      "pattern": "\\b(FEATURE_FLAG|feature.flags|kill switch|rollout_percentage|allowlist_json|isFeatureEnabled)\\b",
+      "flags": "gmi",
+      "include": ["**/*.{py,ts,tsx,json}"],
+      "exclude": ["**/tests/**", "**/test/**", "**/*_test.py", "**/test_*.py", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "ast",
+      "id": "fetch-ts-ast",
+      "description": "fetch(url) in TypeScript (structural; requires --ast)",
+      "language": "typescript",
+      "pattern": "fetch($URL)",
+      "include": ["**/*.{ts,cts,mts}"],
+      "exclude": ["**/tests/**", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "ast",
+      "id": "fetch-tsx-ast",
+      "description": "fetch(url) in TSX (structural; requires --ast)",
+      "language": "tsx",
+      "pattern": "fetch($URL)",
+      "include": ["**/*.tsx"],
+      "exclude": ["**/tests/**", "**/*.test.tsx", "**/*.spec.tsx"]
+    },
+    {
+      "kind": "ast",
+      "id": "eval-ts-ast",
+      "description": "eval() in TypeScript (structural; requires --ast)",
+      "language": "typescript",
+      "pattern": "eval($ARG)",
+      "include": ["**/*.{ts,cts,mts}"],
+      "exclude": ["**/tests/**", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "ast",
+      "id": "eval-js-ast",
+      "description": "eval() in JavaScript (structural; requires --ast)",
+      "language": "javascript",
+      "pattern": "eval($ARG)",
+      "include": ["**/*.{js,jsx,mjs,cjs}"],
+      "exclude": ["**/tests/**", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "ast",
+      "id": "function-ctor-ts-ast",
+      "description": "new Function(...) in TypeScript (structural; requires --ast)",
+      "language": "typescript",
+      "pattern": "new Function($$$)",
+      "include": ["**/*.{ts,cts,mts}"],
+      "exclude": ["**/tests/**", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "ast",
+      "id": "path-join-ts-ast",
+      "description": "path.join in TypeScript (structural; requires --ast)",
+      "language": "typescript",
+      "pattern": "path.join($$$)",
+      "include": ["**/*.{ts,cts,mts}"],
+      "exclude": ["**/tests/**", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "ast",
+      "id": "child-process-js-ast",
+      "description": "child_process.exec (structural; requires --ast)",
+      "language": "javascript",
+      "pattern": "exec($CMD, $$$)",
+      "include": ["**/*.{js,jsx,mjs,cjs}"],
+      "exclude": ["**/tests/**", "**/*.test.ts", "**/*.spec.ts"]
+    },
+    {
+      "kind": "ast",
+      "id": "innerhtml-tsx-ast",
+      "description": "dangerouslySetInnerHTML JSX attribute (structural; requires --ast)",
+      "language": "tsx",
+      "pattern": "<$ELEM dangerouslySetInnerHTML={$$$} />",
+      "include": ["**/*.tsx"],
+      "exclude": ["**/tests/**", "**/*.test.tsx", "**/*.spec.tsx"]
+    }
+  ],
+  "mapGuidance": "You are hunting real vulnerabilities in this SaaS (auth bypass, CSRF, webhook forgery, worker impersonation, IDOR, SSRF, SQLi, secret leak, RCE, XSS, open redirect, prompt injection). Bias to recall in the shard; you apply the false-positive gate.\n\nProduct threat model:\n- Unauthenticated internet: POST /api/v1/webhooks/{github,stripe,gcp-budget}, POST /api/v1/tasks/{process-review,cleanup}, GET /health, GET /api/v1/auth/github/{login,callback}, POST /api/v1/auth/logout. Everything under /api/v1/dashboard and /api/v1/admin is session-authenticated.\n- Dashboard: JWT in HttpOnly cookie (devreview_session) OR Authorization Bearer; CSRF double-submit (XSRF-TOKEN cookie + X-XSRF-TOKEN header) is attached only on the dashboard router via Depends(enforce_csrf). Cookie SameSite is None outside development (cross-site POSTs send the session cookie). Admin router uses Depends(require_admin) but does NOT attach enforce_csrf — treat missing CSRF on cookie-authenticated admin mutations as a finding unless another control clearly blocks it.\n- Webhooks: GitHub must verify X-Hub-Signature-256 (HMAC-SHA256) before parsing; Stripe must call construct_stripe_event (note development skip when STRIPE_WEBHOOK_SECRET==whsec_test); gcp-budget uses the same OIDC/X-Task-Token path as workers. Body size is capped (MAX_WEBHOOK_BODY_BYTES) — check order (413 vs 401) and that HMAC uses the raw body.\n- Workers: verify_worker_request prefers Google OIDC (CLOUD_TASKS_SA_EMAIL + audience CLOUD_TASKS_WORKER_URL) and falls back to hmac.compare_digest on X-Task-Token when allows_static_worker_token(). Production startup requires OIDC; still flag if a misconfig lets the static token work, if audience is wrong, or if task JSON (organization_id/owner/repo/pull_number) is trusted after a weak auth check — that is GitHub App impersonation.\n- IDOR: every dashboard read/write keyed by org_id, repo_id, or review_id must call get_authorized_org (installation list or personal-login fallback for github_account_type==User). Admin endpoints may skip tenant checks but must stay behind require_admin. Stripe checkout uses client_reference_id=org.id — forged Stripe events without a valid signature can credit the wrong org.\n- SSRF: GitHubAppClient builds https://api.github.com/repos/{owner}/{repo}/... often without quote() on owner/repo (SHAs are quoted). httpx also talks to GitHub OAuth and Cloud Tasks. Flag if owner/repo/URL can come from an unauthenticated or HMAC-failed request, or if fetch() leaves NEXT_PUBLIC_API_URL.\n- Stripe: checkout.session.completed / invoice.payment_succeeded grant credits; confirm price_id allowlists, currency checks, and ProcessedStripeEvent idempotency cannot be bypassed.\n- Secrets: SecretStr + secret_value(); never log access_token, CLOUD_TASKS_AUTH_TOKEN, JWT, or webhook secrets. Frontend log-scrubber and backend sanitizer.py must actually cover the log site. .env.example and action.yml GH_TOKEN/API keys are in scope.\n- LLM: PR diffs, comments, and .devreview.yml (yaml.safe_load of attacker-controlled repo files) enter prompts. Flag delimiter breakout or instruction override that changes review behavior or exfiltrates installation tokens — not generic 'LLM can be tricked' without a concrete sink.\n- CORS: allow_credentials=True + ALLOWED_ORIGINS; wildcard or extra sibling origins plus parent-domain XSRF cookie is session theft. Cookie Domain mis-derivation (co.uk-style public suffix) is in config.py.\n\nReport only exploitable issues with attacker preconditions. Cite path+line. Do not report SQLAlchemy text('SELECT 1') health checks or Path(__file__) prompt reads unless user input reaches them.",
+  "reduceGuidance": "Deduplicate by root cause, not by file. Prefer the strongest statement (e.g. 'worker OIDC fallback accepts static token in production if CLOUD_TASKS_SA_EMAIL is empty' over listing each task route). Build attack chains when one finding satisfies another's precondition:\n- Webhook HMAC skip → enqueue arbitrary ProcessReviewTask → GitHub App comments/checks on victim repos.\n- Worker auth bypass → same GitHub App / ledger side effects without a GitHub delivery.\n- CSRF on admin (no enforce_csrf) + SameSite=None session cookie → adjust credits, disable repos, reset circuit breaker.\n- Missing get_authorized_org on a dashboard org_id/repo_id/review_id parameter → cross-tenant read/write.\n- Unsigned Stripe event + client_reference_id → credit theft / plan upgrade.\n- CORS * or untrusted origin + non-HttpOnly XSRF cookie on parent domain → CSRF/session-adjacent theft.\nTriage: P0 = unauthenticated remote (forged webhook/worker, auth bypass, RCE); P1 = authenticated cross-tenant, CSRF on privileged mutations, secret leak; P2 = defense-in-depth (OpenAPI in non-prod, profiling HTML, prompt-injection without token exfil); P3 = informational. Drop health-check SQL, static prompt Path reads, and yaml.safe_load of trusted operator files unless a path from the attacker is shown.",
+  "verifyGuidance": "Do not fire live webhooks or forge Stripe/GitHub signatures against production. Prefer tracing the handler: signature/OIDC check vs body parse order, Depends() on the router vs the endpoint, and whether get_authorized_org runs before the query. If a local stack can be started, hit /health, an unauthenticated webhook without a signature (expect 401), and a dashboard mutation without X-XSRF-TOKEN (expect 403). For CSRF on /api/v1/admin, confirm the router really lacks enforce_csrf and that cookie auth is sufficient. For worker auth, read allows_static_worker_token() and validate_production(). If the service cannot be started, mark inconclusive and name the missing secret/DB rather than guessing runtime config."
+}
